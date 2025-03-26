@@ -28,3 +28,4 @@ class warrior(protagonist):
     def __init__(self, name="", health=100, mana=100, strenth=1, agility=1, intellect=1, experience=0, level=1, weapon=None):
         super().__init__(name, health, mana, strenth, agility, intellect, experience, level)
         self.atWeaponOBJ = weapon
+
