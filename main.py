@@ -104,3 +104,5 @@ keyboard.on_press_key("d", lambda _: move_player('d'))
 
 # Запускаем отрисовку поля
 draw_field()
+
+#Сосумба
