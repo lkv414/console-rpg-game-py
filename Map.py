@@ -1,5 +1,6 @@
+from reprint import output
 import random
-import os
+import time
 
 # Константы
 MAP_SIZE = 20
@@ -45,17 +46,17 @@ class GameMap:
                 self.map[y][x] = symbol
                 break
 
-    def display_map(self):
-        os.system('cls' if os.name == 'nt' else 'clear')  # Очистка консоли
+    def display_map(self, out):
+        # Формируем карту для вывода через reprinter
         for y in range(self.size):
+            row = ""
             for x in range(self.size):
-                # Показываем только область видимости игрока
                 if abs(self.player_x - x) <= VISION_SIZE and abs(self.player_y - y) <= VISION_SIZE:
-                    print(self.map[y][x], end=" ")
+                    row += self.map[y][x] + " "
                 else:
-                    print("⬛", end=" ")  # Скрытая область
-            print()
-        print("\nУправление: w - вверх, s - вниз, a - лево, d - право, e - взаимодействие, q - выход")
+                    row += "⬛ "
+            out[y] = row
+        out[self.size] = "Управление: w - вверх, s - вниз, a - лево, d - право, e - взаимодействие, q - выход"
 
     def move_player(self, direction):
         new_x, new_y = self.player_x, self.player_y
@@ -98,18 +99,22 @@ class GameMap:
 
 def main():
     game = GameMap()
-    while True:
-        game.display_map()
-        action = input("Твой ход: ").lower()
-        if action in ['w', 's', 'a', 'd']:
-            game.move_player(action)
-        elif action == 'e':
-            if game.map[game.player_y][game.player_x] == CITY:
-                game.enter_city()
-        elif action == 'q':
-            print("Игра окончена!")
-            break
+    with output(initial_len=MAP_SIZE + 1, interval=0) as out:
+        while True:
+            game.display_map(out)
+            time.sleep(0.1)  # Небольшая задержка для стабильности вывода
+            action = input("Твой ход: ").lower()
+            if action in ['w', 's', 'a', 'd']:
+                game.move_player(action)
+            elif action == 'e':
+                if game.map[game.player_y][game.player_x] == CITY:
+                    game.enter_city()
+            elif action == 'q':
+                print("Игра окончена!")
+                break
 
 
 if __name__ == "__main__":
     main()
+
+
