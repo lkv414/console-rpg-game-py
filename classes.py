@@ -53,3 +53,26 @@ class warrior(protagonist):
             self.experience = 0
         weapon_name = self.weapon if self.weapon else "кулаками"
         return f"{self.name} нанес с помощью {weapon_name} по {target} урон {damage}."
+
+
+# класс мага
+class Mage(protagonist):
+    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1, spells=None):
+        super().__init__(name, health, mana, strength, agility, intellect, experience, level)
+        self.spells = spells if spells is not None else []
+
+    def scream(self):
+        return f"Я маг-герой {self.name}, и я знаю {len(self.spells)} заклинаний."
+
+    def add_magic(self, spell):
+        self.spells.append(spell)
+
+    def cast_spell(self, spell, target, damage):
+        self.experience += 10
+        if self.experience >= 100:
+            self.level += 1
+            self.strength += 1
+            self.agility += 2
+            self.intellect += 4
+            self.experience = 0
+        return f"{self.name} нанес заклинанием {spell} по {target} урон {damage}."
