@@ -111,7 +111,7 @@ class NPC(Person):
         return f"Я {self.name}, обычный NPC!"
 
 
-# травник
+# класс травника
 class Herbalist(NPC):
     def __init__(self, name="", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
@@ -122,20 +122,20 @@ class Herbalist(NPC):
         return f"Я {self.name}, обычный {self.profession}!"
 
     def make_potion(self, potion_name, heal_power):
-        potion = {"name": potion_name, "heal_power": heal_power}
+        potion = Potion(potion_name, heal_power)
         self.items.append(potion)
         return f"Зелье {potion_name} с лечебной силой {heal_power} создано и добавлено в инвентарь!"
 
     def job(self, target, potion_name):
         for potion in self.items:
-            if potion["name"] == potion_name:
-                target.drink_heal_potion(potion["heal_power"])
+            if potion.name == potion_name:
+                target.drink_heal_potion(potion.heal_power)
                 self.items.remove(potion)
-                return f"{self.name} передал зелье {potion_name} для {target.name}. {target.name} восстановил {potion['heal_power']} здоровья!"
+                return f"{self.name} передал зелье {potion_name} для {target.name}. {target.name} восстановил {potion.heal_power} здоровья!"
         return f"Зелье {potion_name} не найдено в инвентаре {self.name}!"
 
 
-# кузнец
+# класс кузнеца
 class Blacksmith(NPC):
     def __init__(self, name="", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
@@ -146,17 +146,17 @@ class Blacksmith(NPC):
         return f"Я {self.name}, обычный {self.profession}!"
 
     def forge_item(self, item_name, item_power):
-        item = {"name": item_name, "power": item_power}
+        item = Weapon(item_name, item_power)
         self.items.append(item)
         return f"Предмет {item_name} с силой {item_power} выкован и добавлен в инвентарь!"
 
     def give_item(self, target, item_name):
         for item in self.items:
-            if item["name"] == item_name:
+            if item.name == item_name:
                 if hasattr(target, "weapon"):
-                    target.weapon = item["name"]
+                    target.weapon = item.name
                     self.items.remove(item)
-                    return f"{self.name} передал {item_name} для {target.name}. Теперь у {target.name} новое оружие: {item_name} с силой {item['power']}!"
+                    return f"{self.name} передал {item_name} для {target.name}. Теперь у {target.name} новое оружие: {item_name} с силой {item.power}!"
                 elif hasattr(target, "items"):
                     target.items.append(item)
                     self.items.remove(item)
@@ -164,3 +164,79 @@ class Blacksmith(NPC):
                 else:
                     return f"{target.name} не может принять предмет {item_name}!"
         return f"Предмет {item_name} не найден в инвентаре {self.name}!"
+
+
+# класс торговца
+class Trader(NPC):
+    def __init__(self, name="", health=100, mana=100, level=1, items=None):
+        super().__init__(name, health, mana, level)
+        self.items = items if items is not None else []
+        self.profession = "Торговец"
+
+    def scream(self):
+        return f"Добро пожаловать! Я {self.name}, местный {self.profession}."
+
+    def add_item(self, item):
+        self.items.append(item)
+        return f"Предмет {item.name} добавлен в инвентарь {self.name}!"
+
+    def sell_item(self, target, item_name, price):
+        for item in self.items:
+            if item.name == item_name:
+                if hasattr(target, "weapon"):
+                    target.weapon = item.name
+                    self.items.remove(item)
+                    return f"{self.name} продал {item_name} для {target.name} за {price} монет. Теперь у {target.name} новое оружие: {item_name}!"
+                elif hasattr(target, "items"):
+                    target.items.append(item)
+                    self.items.remove(item)
+                    return f"{self.name} продал {item_name} для {target.name} за {price} монет. Предмет добавлен в инвентарь {target.name}!"
+                else:
+                    return f"{target.name} не может принять предмет {item_name}!"
+        return f"Предмет {item_name} не найден в инвентаре {self.name}!"
+
+
+# класс странствующего волшебника
+class WanderingWizard(NPC):
+    def __init__(self, name="", health=100, mana=100, level=1, items=None):
+        super().__init__(name, health, mana, level)
+        self.items = items if items is not None else []
+        self.profession = "Странствующий Волшебник"
+
+    def scream(self):
+        return f"Я {self.name}, {self.profession}, могу поделиться знаниями."
+
+    def teach_spell(self, target, spell_name):
+        if hasattr(target, "spells"):
+            target.spells.append(spell_name)
+            return f"{self.name} научил {target.name} заклинанию {spell_name}!"
+        return f"{target.name} не может выучить заклинание {spell_name}!"
+
+
+# классы предметов
+class Weapon:
+    def __init__(self, name, power):
+        self.name = name
+        self.power = power
+
+    def use(self):
+        return f"Использовано оружие {self.name} с силой {self.power}!"
+
+
+class Armor:
+    def __init__(self, name, defense):
+        self.name = name
+        self.defense = defense
+
+    def use(self):
+        return f"Надеты доспехи {self.name} с защитой {self.defense}!"
+
+
+class Potion:
+    def __init__(self, name, heal_power):
+        self.name = name
+        self.heal_power = heal_power
+
+    def use(self, target):
+        target.drink_heal_potion(self.heal_power)
+        return f"Зелье {self.name} использовано! {target.name} восстановил {self.heal_power} здоровья."
