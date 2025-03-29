@@ -16,7 +16,7 @@ class Person:
 
 
 # не ну это наш гг
-class protagonist(Person):
+class Protagonist(Person):
     def __init__(self, name, health=0, mana=0, strength=0, agility=0, intellect=0, experience=0, level=0):
         super().__init__(name, health, mana)
         self.strength = strength
@@ -33,10 +33,10 @@ class protagonist(Person):
 
 
 # дальше идёт класс воина
-class warrior(protagonist):
-    def __init__(self, name="", health=100, mana=100, strenth=1, agility=1, intellect=1, experience=0, level=1,
+class Warrior(Protagonist):
+    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1,
                  weapon=None):
-        super().__init__(name, health, mana, strenth, agility, intellect, experience, level)
+        super().__init__(name, health, mana, strength, agility, intellect, experience, level)
         self.weapon = weapon
 
     def scream(self):
@@ -56,10 +56,11 @@ class warrior(protagonist):
 
 
 # класс мага
-class Mage(protagonist):
-    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1, spells=None):
+class Mage(Protagonist):
+    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1,
+                 spells=None):
         super().__init__(name, health, mana, strength, agility, intellect, experience, level)
-        self.spells = spells if spells is not None else []
+        self.spells = spells or []
 
     def scream(self):
         return f"Я маг-герой {self.name}, и я знаю {len(self.spells)} заклинаний."
@@ -76,3 +77,90 @@ class Mage(protagonist):
             self.intellect += 4
             self.experience = 0
         return f"{self.name} нанес заклинанием {spell} по {target} урон {damage}."
+
+
+# класс лучника
+class Archer(Protagonist):
+    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1,
+                 weapon="bow"):
+        super().__init__(name, health, mana, strength, agility, intellect, experience, level)
+        self.weapon = weapon
+
+    def attack(self, target, damage):
+        self.experience += 10
+        if self.experience >= 100:
+            self.level += 1
+            self.strength += 2
+            self.agility += 3
+            self.intellect += 1
+            self.experience = 0
+        return f"{self.name} выпустила стрелу из {self.weapon} по {target} урон {damage}."
+
+    def scream(self):
+        return f"Я лучница {self.name}, и мой лук — {self.weapon}."
+
+
+# нпс
+class NPC(Person):
+    def __init__(self, name="", health=100, mana=100, level=1):
+        super().__init__(name, health, mana)
+        self.level = level
+        self.items = []
+
+    def scream(self):
+        return f"Я {self.name}, обычный NPC!"
+
+
+# травник
+class Herbalist(NPC):
+    def __init__(self, name="", health=100, mana=100, level=1, items=None):
+        super().__init__(name, health, mana, level)
+        self.items = items if items is not None else []
+        self.profession = "Травник"
+
+    def scream(self):
+        return f"Я {self.name}, обычный {self.profession}!"
+
+    def make_potion(self, potion_name, heal_power):
+        potion = {"name": potion_name, "heal_power": heal_power}
+        self.items.append(potion)
+        return f"Зелье {potion_name} с лечебной силой {heal_power} создано и добавлено в инвентарь!"
+
+    def job(self, target, potion_name):
+        for potion in self.items:
+            if potion["name"] == potion_name:
+                target.drink_heal_potion(potion["heal_power"])
+                self.items.remove(potion)
+                return f"{self.name} передал зелье {potion_name} для {target.name}. {target.name} восстановил {potion['heal_power']} здоровья!"
+        return f"Зелье {potion_name} не найдено в инвентаре {self.name}!"
+
+
+# кузнец
+class Blacksmith(NPC):
+    def __init__(self, name="", health=100, mana=100, level=1, items=None):
+        super().__init__(name, health, mana, level)
+        self.items = items if items is not None else []
+        self.profession = "Кузнец"
+
+    def scream(self):
+        return f"Я {self.name}, обычный {self.profession}!"
+
+    def forge_item(self, item_name, item_power):
+        item = {"name": item_name, "power": item_power}
+        self.items.append(item)
+        return f"Предмет {item_name} с силой {item_power} выкован и добавлен в инвентарь!"
+
+    def give_item(self, target, item_name):
+        for item in self.items:
+            if item["name"] == item_name:
+                if hasattr(target, "weapon"):
+                    target.weapon = item["name"]
+                    self.items.remove(item)
+                    return f"{self.name} передал {item_name} для {target.name}. Теперь у {target.name} новое оружие: {item_name} с силой {item['power']}!"
+                elif hasattr(target, "items"):
+                    target.items.append(item)
+                    self.items.remove(item)
+                    return f"{self.name} передал {item_name} для {target.name}. Предмет добавлен в инвентарь {target.name}!"
+                else:
+                    return f"{target.name} не может принять предмет {item_name}!"
+        return f"Предмет {item_name} не найден в инвентаре {self.name}!"
