@@ -240,3 +240,54 @@ class Potion:
     def use(self, target):
         target.drink_heal_potion(self.heal_power)
         return f"Зелье {self.name} использовано! {target.name} восстановил {self.heal_power} здоровья."
+
+
+# враги
+class Enemy(Person):
+    def __init__(self, name="", health=100, mana=100, level=1, items=None):
+        super().__init__(name, health, mana)
+        self.level = level
+        self.items = items if items is not None else []
+
+    def attack(self, target, damage):
+        return f"{self.name} атаковал {target.name}, нанеся {damage} урона."
+
+    def __str__(self):
+        return f"{self.name} (уровень: {self.level}, здоровье: {self.health}, мана: {self.mana})"
+
+
+class Imp(Enemy):
+    def __init__(self, name="Бес", health=80, mana=150, level=1, items=None):
+        super().__init__(name, health, mana, level, items)
+
+    def steal_mana(self, target):
+        stolen_mana = min(20, target.mana)
+        target.mana -= stolen_mana
+        self.mana += stolen_mana
+        return f"{self.name} украл {stolen_mana} маны у {target.name}!"
+
+
+class Necromancer(Enemy):
+    def __init__(self, name="Некромант", health=90, mana=120, level=2, items=None):
+        super().__init__(name, health, mana, level, items)
+
+    def raise_dead(self):
+        return f"{self.name} поднял скелета из мёртвых для боя!"
+
+    def curse(self, target, damage):
+        return f"{self.name} наложил проклятие на {target.name}, нанеся {damage} урона и снизив силу!"
+
+
+class Boss(Imp):
+    def __init__(self, name="Король Бесов", health=300, mana=200, level=5, items=None):
+        super().__init__(name, health, mana, level, items)
+
+    def summon_minions(self):
+        return f"{self.name} призвал двух младших бесов для помощи в бою!"
+
+    def dark_pulse(self, target, damage):
+        total_damage = damage + self.level * 5
+        return f"{self.name} выпустил темный импульс, нанеся {total_damage} урона {target.name}!"
+
+    def __str__(self):
+        return f"БОСС: {self.name} (уровень: {self.level}, здоровье: {self.health}, мана: {self.mana})"
