@@ -1,6 +1,7 @@
-from reprint import output
 import random
 import time
+from classes import Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss
+from reprint import output
 import threading
 
 # Константы
@@ -10,7 +11,10 @@ VIEW_WIDTH = 27      # Видимая ширина карты в клетках 
 VIEW_HEIGHT = 27     # Видимая высота карты в клетках
 MAP_WIDTH = 200
 MAP_HEIGHT = 200
-STATS_WIDTH = 63     # Ширина области статистики (120 - 54 (карта) - 3 (разделитель и рамка))
+STATS_WIDTH = 63     # Ширина области статистики и лога (120 - 54 (карта) - 3 (разделитель и рамка))
+LOG_HEIGHT = 15      # Высота области лога (15 строк)
+STATS_HEIGHT = 10    # Высота области статистики (10 строк, итого 27 строк с учётом рамки)
+INTERACTION_RADIUS = 2  # Радиус взаимодействия (2 клетки)
 
 # Символы
 PLAYER = "@"
@@ -18,12 +22,15 @@ MONSTER = "M"
 NPC = "N"
 CITY = "C"
 EMPTY = "\033[32mW\033[0m"  # Зелёный W
-BORDER = "#"
+BORDER = "\033[30m#\033[0m"  # Чёрный # с ANSI-кодом
 DIVIDER = "|"
 
 # Глобальные переменные
 player_x, player_y = MAP_WIDTH // 2, MAP_HEIGHT // 2
 field = [[EMPTY for _ in range(MAP_WIDTH)] for _ in range(MAP_HEIGHT)]
+interaction_log = []  # Лог взаимодействий
+current_entity = None  # Текущий объект взаимодействия (монстр или NPC)
+entity_position = None  # Позиция текущего объекта взаимодействия
 
 def place_random(symbol, count=1):
     global player_x, player_y
@@ -58,7 +65,7 @@ def can_move(new_x, new_y):
     return True
 
 def move_player(direction):
-    global player_x, player_y
+    global player_x, player_y, current_entity, entity_position
     old_x, old_y = player_x, player_y
     new_x, new_y = player_x, player_y
 
@@ -79,31 +86,67 @@ def move_player(direction):
                     field[old_y + i][old_x + j] = EMPTY
         player_x, player_y = new_x, new_y
         draw_person(player_x, player_y)
+        # Если игрок отошёл от объекта, сбрасываем текущее взаимодействие
+        if entity_position and not (abs(player_x - entity_position[0]) <= INTERACTION_RADIUS and abs(player_y - entity_position[1]) <= INTERACTION_RADIUS):
+            current_entity = None
+            entity_position = None
+            interaction_log.append("Вы отошли от объекта.")
 
-def interact():
+def interact(interact_callback):
+    global interaction_log, current_entity, entity_position
     interactions = []
-    for i in range(2):
-        for j in range(3):
-            target = field[player_y + i][player_x + j]
-            if target == MONSTER:
-                interactions.append("Ты встретил монстра! Бой начался!")
-            elif target == NPC:
-                interactions.append("NPC говорит: Привет, путешественник!")
-            elif target == CITY:
-                interactions.append("Житель говорит: Добро пожаловать в наш город!")
+
+    # Если уже есть текущее взаимодействие (например, бой с монстром), продолжаем его
+    if current_entity:
+        if isinstance(current_entity, (Imp, Necromancer, Boss)):
+            # Продолжаем бой с монстром
+            msg = interact_callback("monster", current_entity)
+            interactions.append(msg)
+            # Если монстр мёртв, убираем его с карты
+            if current_entity.health <= 0:
+                field[entity_position[1]][entity_position[0]] = EMPTY
+                current_entity = None
+                entity_position = None
+        elif isinstance(current_entity, (Herbalist, Blacksmith, Trader, WanderingWizard)):
+            # Продолжаем взаимодействие с NPC
+            msg = interact_callback("npc", current_entity)
+            interactions.append(msg)
+        interaction_log.extend(interactions)
+        if len(interaction_log) > LOG_HEIGHT:
+            interaction_log = interaction_log[-LOG_HEIGHT:]
+        return interactions
+
+    # Проверяем, есть ли рядом объекты для взаимодействия (в радиусе 2 клеток)
+    for i in range(-INTERACTION_RADIUS, INTERACTION_RADIUS + 1):
+        for j in range(-INTERACTION_RADIUS, INTERACTION_RADIUS + 1):
+            target_x, target_y = player_x + j, player_y + i
+            if 0 <= target_x < MAP_WIDTH and 0 <= target_y < MAP_HEIGHT:
+                target = field[target_y][target_x]
+                if target == MONSTER:
+                    current_entity = interact_callback("create_monster")
+                    entity_position = (target_x, target_y)
+                    msg = interact_callback("monster", current_entity)
+                    interactions.append(msg)
+                elif target == NPC:
+                    current_entity = interact_callback("create_npc")
+                    entity_position = (target_x, target_y)
+                    msg = interact_callback("npc", current_entity)
+                    interactions.append(msg)
+                elif target == CITY:
+                    interactions.append("Житель говорит: Добро пожаловать в наш город!")
+    interaction_log.extend(interactions)
+    if len(interaction_log) > LOG_HEIGHT:
+        interaction_log = interaction_log[-LOG_HEIGHT:]
     return interactions
 
-def draw_field(out, get_stats_callback):
+def draw_field(out, get_stats_callback, get_log_callback):
     while True:
-        # Центр персонажа (середина 2x3)
         center_x, center_y = player_x + 1, player_y + 1
-        # Вычисляем видимую область так, чтобы персонаж был в центре
         start_x = max(0, center_x - VIEW_WIDTH // 2)
         end_x = start_x + VIEW_WIDTH
         start_y = max(0, center_y - VIEW_HEIGHT // 2)
         end_y = start_y + VIEW_HEIGHT
 
-        # Корректируем границы, чтобы не выходить за пределы карты
         if end_x > MAP_WIDTH:
             end_x = MAP_WIDTH
             start_x = max(0, end_x - VIEW_WIDTH)
@@ -113,13 +156,18 @@ def draw_field(out, get_stats_callback):
 
         map_width_symbols = VIEW_WIDTH * 2  # 27 клеток * 2 = 54 символа с пробелами
 
-        # Рисуем рамку и карту
         out[0] = BORDER * CONSOLE_WIDTH
         for i in range(VIEW_HEIGHT):
             row_idx = start_y + i
             map_row = " ".join([field[row_idx][j] for j in range(start_x, end_x)])
-            stats = get_stats_callback(i + 1)
-            row = f"{BORDER}{map_row} {DIVIDER} {stats.ljust(STATS_WIDTH - 1)}{BORDER}"
+            if i < LOG_HEIGHT:
+                # Верхняя часть: лог взаимодействий
+                log_line = get_log_callback(i + 1)
+                row = f"{BORDER}{map_row} {DIVIDER} {log_line.ljust(STATS_WIDTH - 1)}{BORDER}"
+            else:
+                # Нижняя часть: статистика
+                stats = get_stats_callback(i - LOG_HEIGHT + 1)
+                row = f"{BORDER}{map_row} {DIVIDER} {stats.ljust(STATS_WIDTH - 1)}{BORDER}"
             out[i + 1] = row
         out[VIEW_HEIGHT + 1] = BORDER * CONSOLE_WIDTH
 
