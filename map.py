@@ -1,8 +1,7 @@
 import random
 import time
 from classes import Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss
-from reprint import output
-import threading
+
 
 # Константы
 CONSOLE_WIDTH = 120
@@ -31,6 +30,31 @@ field = [[EMPTY for _ in range(MAP_WIDTH)] for _ in range(MAP_HEIGHT)]
 interaction_log = []  # Лог взаимодействий
 current_entity = None  # Текущий объект взаимодействия (монстр или NPC)
 entity_position = None  # Позиция текущего объекта взаимодействия
+
+def wrap_text(text, width):
+    """Переносит текст на следующую строку, если он превышает заданную ширину."""
+    words = text.split()
+    lines = []
+    current_line = []
+    current_length = 0
+
+    for word in words:
+        # Учитываем длину слова и пробел
+        word_length = len(word) + 1  # +1 для пробела
+        if current_length + word_length <= width:
+            current_line.append(word)
+            current_length += word_length
+        else:
+            # Если строка превышает ширину, добавляем её в список и начинаем новую
+            lines.append(" ".join(current_line))
+            current_line = [word]
+            current_length = len(word) + 1
+
+    # Добавляем последнюю строку, если она не пустая
+    if current_line:
+        lines.append(" ".join(current_line))
+
+    return lines
 
 def place_random(symbol, count=1):
     global player_x, player_y
@@ -90,18 +114,24 @@ def move_player(direction):
         if entity_position and not (abs(player_x - entity_position[0]) <= INTERACTION_RADIUS and abs(player_y - entity_position[1]) <= INTERACTION_RADIUS):
             current_entity = None
             entity_position = None
+            interaction_log.clear()  # Очищаем лог при уходе
             interaction_log.append("Вы отошли от объекта.")
 
 def interact(interact_callback):
     global interaction_log, current_entity, entity_position
     interactions = []
 
+    # Очищаем лог перед новым взаимодействием
+    interaction_log.clear()
+
     # Если уже есть текущее взаимодействие (например, бой с монстром), продолжаем его
     if current_entity:
         if isinstance(current_entity, (Imp, Necromancer, Boss)):
             # Продолжаем бой с монстром
             msg = interact_callback("monster", current_entity)
-            interactions.append(msg)
+            # Переносим текст, если он длинный
+            wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
+            interactions.extend(wrapped_msgs)
             # Если монстр мёртв, убираем его с карты
             if current_entity.health <= 0:
                 field[entity_position[1]][entity_position[0]] = EMPTY
@@ -110,7 +140,8 @@ def interact(interact_callback):
         elif isinstance(current_entity, (Herbalist, Blacksmith, Trader, WanderingWizard)):
             # Продолжаем взаимодействие с NPC
             msg = interact_callback("npc", current_entity)
-            interactions.append(msg)
+            wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
+            interactions.extend(wrapped_msgs)
         interaction_log.extend(interactions)
         if len(interaction_log) > LOG_HEIGHT:
             interaction_log = interaction_log[-LOG_HEIGHT:]
@@ -126,14 +157,18 @@ def interact(interact_callback):
                     current_entity = interact_callback("create_monster")
                     entity_position = (target_x, target_y)
                     msg = interact_callback("monster", current_entity)
-                    interactions.append(msg)
+                    wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
+                    interactions.extend(wrapped_msgs)
                 elif target == NPC:
                     current_entity = interact_callback("create_npc")
                     entity_position = (target_x, target_y)
                     msg = interact_callback("npc", current_entity)
-                    interactions.append(msg)
+                    wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
+                    interactions.extend(wrapped_msgs)
                 elif target == CITY:
-                    interactions.append("Житель говорит: Добро пожаловать в наш город!")
+                    msg = "Житель говорит: Добро пожаловать в наш город!"
+                    wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
+                    interactions.extend(wrapped_msgs)
     interaction_log.extend(interactions)
     if len(interaction_log) > LOG_HEIGHT:
         interaction_log = interaction_log[-LOG_HEIGHT:]

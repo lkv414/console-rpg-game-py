@@ -4,13 +4,29 @@ import random
 import keyboard
 import threading
 from reprint import output
-from map import generate_map, move_player, interact, draw_field, interaction_log, CONSOLE_HEIGHT
+from map import generate_map, move_player, interact, draw_field, interaction_log, CONSOLE_HEIGHT, CONSOLE_WIDTH
 from classes import Warrior, Mage, Archer, Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss
 
 # Глобальная переменная для игрока
 player = None
 # Переменная для отслеживания состояния торговли
 is_trading = False
+
+
+def display_game_over():
+    """Отображает экран Game Over."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+    game_over_message = "Game Over"
+    # Центрируем сообщение по горизонтали и вертикали
+    vertical_center = CONSOLE_HEIGHT // 2
+    horizontal_center = (CONSOLE_WIDTH - len(game_over_message)) // 2
+    for i in range(CONSOLE_HEIGHT):
+        if i == vertical_center:
+            print(" " * horizontal_center + game_over_message)
+        else:
+            print()
+    time.sleep(3)
+    exit(0)
 
 
 def choose_class():
@@ -92,9 +108,9 @@ def interact_with_entity(action, entity=None):
             player.health -= monster_damage
             msg += f" Вам осталось {player.health} HP."
 
-            if player.health <= 0:
-                msg += " Вы погибли! Игра окончена."
-                exit(0)
+            if player.health < 1:  # Изменено условие на < 1
+                msg = "Вы погибли! Игра окончена."
+                display_game_over()
         else:
             msg += f" {entity.name} побеждён!"
 
