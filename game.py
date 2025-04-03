@@ -6,12 +6,14 @@ import threading
 from reprint import output
 from map import generate_map, move_player, interact, draw_field, interaction_log, CONSOLE_HEIGHT, CONSOLE_WIDTH, \
     wrap_text
-from classes import Warrior, Mage, Archer, Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss, Potion
+from classes import Warrior, Mage, Archer, Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss, \
+    Potion
 
 # Глобальная переменная для игрока
 player = None
 # Переменная для отслеживания состояния торговли
 is_trading = False
+
 
 def display_game_over():
     """Отображает экран Game Over."""
@@ -27,6 +29,7 @@ def display_game_over():
             print()
     time.sleep(3)
     exit(0)
+
 
 def choose_class():
     global player
@@ -55,6 +58,7 @@ def choose_class():
     player.health_potions.append(Potion("Health Potion", 20))
     player.mana_potions.append(Potion("Mana Potion", 20))
 
+
 def get_player_stats(line):
     if player is None:
         return ""
@@ -78,10 +82,12 @@ def get_player_stats(line):
 
     return stats[line - 1] if 1 <= line <= len(stats) else ""
 
+
 def get_interaction_log(line):
     if line <= 0 or line > len(interaction_log):
         return ""
     return interaction_log[line - 1]
+
 
 def interact_with_entity(action, entity=None):
     global player, is_trading
@@ -92,7 +98,11 @@ def interact_with_entity(action, entity=None):
     elif action == "create_npc":
         # Создаём нового NPC
         npc_types = [Herbalist, Blacksmith, Trader, WanderingWizard]
-        return random.choice(npc_types)()
+        npc = random.choice(npc_types)()
+        # Если это Травник, добавляем зелье для передачи
+        if isinstance(npc, Herbalist):
+            npc.items.append(Potion("Health Potion", 20))
+        return npc
     elif action == "monster" and entity:
         # Бой с монстром
         damage = random.randint(5, 15)
@@ -134,13 +144,17 @@ def interact_with_entity(action, entity=None):
         # Взаимодействие с NPC
         if not is_trading:
             msg = entity.scream()
-            if isinstance(entity, (Trader, Blacksmith, WanderingWizard)):
-                msg += " Хотите торговать? Нажмите 'e' ещё раз."
+            if isinstance(entity, (Herbalist, Trader, Blacksmith, WanderingWizard)):
+                msg += " Хотите взаимодействовать? Нажмите 'e' ещё раз."
                 is_trading = True
             return msg
         else:
-            # Торговля с NPC
-            if isinstance(entity, Trader):
+            # Взаимодействие с NPC
+            if isinstance(entity, Herbalist):
+                # Травник передаёт зелье здоровья
+                potion_name = "Health Potion"
+                msg = entity.job(player, potion_name)
+            elif isinstance(entity, Trader):
                 # Торговец продаёт зелья
                 item_name = random.choice(["Health Potion", "Mana Potion"])
                 price = 10
@@ -161,6 +175,7 @@ def interact_with_entity(action, entity=None):
             return msg
     return "Ничего не произошло."
 
+
 def use_health_potion():
     """Использовать зелье здоровья."""
     msg = player.use_health_potion()
@@ -168,12 +183,14 @@ def use_health_potion():
     wrapped_msgs = wrap_text(msg, 63 - 1)
     interaction_log.extend(wrapped_msgs)
 
+
 def use_mana_potion():
     """Использовать зелье маны."""
     msg = player.use_mana_potion()
     interaction_log.clear()
     wrapped_msgs = wrap_text(msg, 63 - 1)
     interaction_log.extend(wrapped_msgs)
+
 
 def main():
     choose_class()
@@ -193,6 +210,7 @@ def main():
         keyboard.on_press_key("q", lambda _: exit(0))
 
         thread.join()
+
 
 if __name__ == "__main__":
     main()
