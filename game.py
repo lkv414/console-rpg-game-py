@@ -4,14 +4,14 @@ import random
 import keyboard
 import threading
 from reprint import output
-from map import generate_map, move_player, interact, draw_field, interaction_log, CONSOLE_HEIGHT, CONSOLE_WIDTH
-from classes import Warrior, Mage, Archer, Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss
+from map import generate_map, move_player, interact, draw_field, interaction_log, CONSOLE_HEIGHT, CONSOLE_WIDTH, \
+    wrap_text
+from classes import Warrior, Mage, Archer, Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss, Potion
 
 # Глобальная переменная для игрока
 player = None
 # Переменная для отслеживания состояния торговли
 is_trading = False
-
 
 def display_game_over():
     """Отображает экран Game Over."""
@@ -27,7 +27,6 @@ def display_game_over():
             print()
     time.sleep(3)
     exit(0)
-
 
 def choose_class():
     global player
@@ -51,6 +50,10 @@ def choose_class():
     print(player.scream())
     time.sleep(2)
 
+    # Даём игроку начальные деньги и зелья для теста
+    player.money = 50
+    player.health_potions.append(Potion("Health Potion", 20))
+    player.mana_potions.append(Potion("Mana Potion", 20))
 
 def get_player_stats(line):
     if player is None:
@@ -66,18 +69,19 @@ def get_player_stats(line):
         f"Intellect: {player.intellect}",
         f"Level: {player.level}",
         f"Experience: {player.experience}",
+        f"Money: {player.money}",  # Добавляем деньги
+        f"Health Potions: {len(player.health_potions)}",  # Количество зелий здоровья
+        f"Mana Potions: {len(player.mana_potions)}",  # Количество зелий маны
         f"Weapon: {getattr(player, 'weapon', 'None')}",
         f"Spells: {', '.join(player.spells) if hasattr(player, 'spells') and player.spells else 'None'}"
     ]
 
     return stats[line - 1] if 1 <= line <= len(stats) else ""
 
-
 def get_interaction_log(line):
     if line <= 0 or line > len(interaction_log):
         return ""
     return interaction_log[line - 1]
-
 
 def interact_with_entity(action, entity=None):
     global player, is_trading
@@ -88,7 +92,7 @@ def interact_with_entity(action, entity=None):
     elif action == "create_npc":
         # Создаём нового NPC
         npc_types = [Herbalist, Blacksmith, Trader, WanderingWizard]
-        return random.choice(npc_types)(name=f"{random.choice(npc_types).__name__} {random.randint(1, 100)}")
+        return random.choice(npc_types)()
     elif action == "monster" and entity:
         # Бой с монстром
         damage = random.randint(5, 15)
@@ -99,42 +103,77 @@ def interact_with_entity(action, entity=None):
         elif isinstance(player, Archer):
             msg = player.attack(entity.name, damage)
         entity.health -= damage
+        # Учитываем бонусный урон от характеристик
+        if isinstance(player, Warrior):
+            entity.health -= player.strength
+        elif isinstance(player, Mage):
+            entity.health -= player.intellect * 2
+        elif isinstance(player, Archer):
+            entity.health -= player.agility
         msg += f" {entity.name} осталось {entity.health} HP."
 
         if entity.health > 0:
             # Монстр отвечает
             monster_damage = random.randint(3, 10)
-            msg += f" {entity.attack(player, monster_damage)}"
-            player.health -= monster_damage
+            # Шанс уклонения игрока зависит от agility (agility * 2%)
+            dodge_chance = player.agility * 2
+            msg += f" {entity.attack(player, monster_damage, dodge_chance)}"
             msg += f" Вам осталось {player.health} HP."
 
-            if player.health < 1:  # Изменено условие на < 1
+            if player.health < 1:  # Условие на < 1
                 msg = "Вы погибли! Игра окончена."
                 display_game_over()
         else:
-            msg += f" {entity.name} побеждён!"
+            # Монстр побеждён, дропаем деньги
+            dropped_money = random.randint(5, 20)
+            player.money += dropped_money
+            msg += f" {entity.name} побеждён! Вы получили {dropped_money} монет."
 
         return msg
     elif action == "npc" and entity:
         # Взаимодействие с NPC
         if not is_trading:
             msg = entity.scream()
-            if isinstance(entity, Trader):
+            if isinstance(entity, (Trader, Blacksmith, WanderingWizard)):
                 msg += " Хотите торговать? Нажмите 'e' ещё раз."
                 is_trading = True
             return msg
         else:
-            # Торговля с Trader
+            # Торговля с NPC
             if isinstance(entity, Trader):
-                item = entity.__class__.__name__ + " Item"
-                entity.add_item(type('Item', (), {'name': item}))
-                msg = entity.sell_item(player, item, 10)
+                # Торговец продаёт зелья
+                item_name = random.choice(["Health Potion", "Mana Potion"])
+                price = 10
+                msg = entity.sell_item(player, item_name, price)
+            elif isinstance(entity, Blacksmith):
+                # Кузнец продаёт меч
+                weapon_name = "Меч"
+                price = 15
+                msg = entity.sell_weapon(player, weapon_name, price)
+            elif isinstance(entity, WanderingWizard):
+                # Волшебник продаёт заклинание
+                spell_name = "Fireball"
+                price = 20
+                msg = entity.sell_spell(player, spell_name, price)
             else:
                 msg = "Этот NPC не торгует."
             is_trading = False
             return msg
     return "Ничего не произошло."
 
+def use_health_potion():
+    """Использовать зелье здоровья."""
+    msg = player.use_health_potion()
+    interaction_log.clear()
+    wrapped_msgs = wrap_text(msg, 63 - 1)
+    interaction_log.extend(wrapped_msgs)
+
+def use_mana_potion():
+    """Использовать зелье маны."""
+    msg = player.use_mana_potion()
+    interaction_log.clear()
+    wrapped_msgs = wrap_text(msg, 63 - 1)
+    interaction_log.extend(wrapped_msgs)
 
 def main():
     choose_class()
@@ -149,10 +188,11 @@ def main():
         keyboard.on_press_key("a", lambda _: move_player('a'))
         keyboard.on_press_key("d", lambda _: move_player('d'))
         keyboard.on_press_key("e", lambda _: interact(interact_with_entity))
+        keyboard.on_press_key("h", lambda _: use_health_potion())  # Использовать зелье здоровья
+        keyboard.on_press_key("m", lambda _: use_mana_potion())  # Использовать зелье маны
         keyboard.on_press_key("q", lambda _: exit(0))
 
         thread.join()
-
 
 if __name__ == "__main__":
     main()
