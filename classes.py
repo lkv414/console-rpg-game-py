@@ -1,4 +1,5 @@
 # начало начал
+import random
 class Person:
     def __init__(self, name="", health=0, mana=0):
         self.name = name
@@ -24,6 +25,9 @@ class Protagonist(Person):
         self.intellect = intellect
         self.experience = experience
         self.level = level
+        self.money = 0  # Добавляем деньги
+        self.health_potions = []  # Список зелий здоровья
+        self.mana_potions = []  # Список зелий маны
 
     def scream(self):
         return f"Я будущий герой {self.name}, но я не выбрал специальность."
@@ -31,11 +35,24 @@ class Protagonist(Person):
     def attack(self, target, damage):
         return f"Я будущий герой {self.name}, и я без оружия, но я нанес {target} урон {damage} своими руками."
 
+    def use_health_potion(self):
+        if self.health_potions:
+            potion = self.health_potions.pop(0)  # Удаляем и получаем первое зелье
+            self.drink_heal_potion(potion.heal_power)
+            return f"{self.name} использовал зелье здоровья и восстановил {potion.heal_power} HP. Осталось зелий: {len(self.health_potions)}."
+        return f"У {self.name} нет зелий здоровья!"
+
+    def use_mana_potion(self):
+        if self.mana_potions:
+            potion = self.mana_potions.pop(0)  # Удаляем и получаем первое зелье
+            self.drink_mana_potion(potion.heal_power)
+            return f"{self.name} использовал зелье маны и восстановил {potion.heal_power} маны. Осталось зелий: {len(self.mana_potions)}."
+        return f"У {self.name} нет зелий маны!"
+
 
 # дальше идёт класс воина
 class Warrior(Protagonist):
-    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1,
-                 weapon=None):
+    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1, weapon=None):
         super().__init__(name, health, mana, strength, agility, intellect, experience, level)
         self.weapon = weapon
 
@@ -51,14 +68,15 @@ class Warrior(Protagonist):
             self.agility += 2
             self.intellect += 1
             self.experience = 0
+        # Урон увеличивается за счёт strength
+        total_damage = damage + self.strength
         weapon_name = self.weapon if self.weapon else "кулаками"
-        return f"{self.name} нанес с помощью {weapon_name} по {target} урон {damage}."
+        return f"{self.name} нанес с помощью {weapon_name} по {target} урон {total_damage}."
 
 
 # класс мага
 class Mage(Protagonist):
-    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1,
-                 spells=None):
+    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1, spells=None):
         super().__init__(name, health, mana, strength, agility, intellect, experience, level)
         self.spells = spells or []
 
@@ -76,13 +94,14 @@ class Mage(Protagonist):
             self.agility += 2
             self.intellect += 4
             self.experience = 0
-        return f"{self.name} нанес заклинанием {spell} по {target} урон {damage}."
+        # Урон увеличивается за счёт intellect
+        total_damage = damage + self.intellect * 2
+        return f"{self.name} нанес заклинанием {spell} по {target} урон {total_damage}."
 
 
 # класс лучника
 class Archer(Protagonist):
-    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1,
-                 weapon="bow"):
+    def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1, weapon="bow"):
         super().__init__(name, health, mana, strength, agility, intellect, experience, level)
         self.weapon = weapon
 
@@ -94,7 +113,9 @@ class Archer(Protagonist):
             self.agility += 3
             self.intellect += 1
             self.experience = 0
-        return f"{self.name} выпустила стрелу из {self.weapon} по {target} урон {damage}."
+        # Урон увеличивается за счёт agility
+        total_damage = damage + self.agility
+        return f"{self.name} выпустил стрелу из {self.weapon} по {target} урон {total_damage}."
 
     def scream(self):
         return f"Я лучница {self.name}, и мой лук — {self.weapon}."
@@ -113,7 +134,7 @@ class NPC(Person):
 
 # класс травника
 class Herbalist(NPC):
-    def __init__(self, name="", health=100, mana=100, level=1, items=None):
+    def __init__(self, name="Травник Василий", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
         self.items = items if items is not None else []
         self.profession = "Травник"
@@ -137,7 +158,7 @@ class Herbalist(NPC):
 
 # класс кузнеца
 class Blacksmith(NPC):
-    def __init__(self, name="", health=100, mana=100, level=1, items=None):
+    def __init__(self, name="Кузнец Иван", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
         self.items = items if items is not None else []
         self.profession = "Кузнец"
@@ -165,10 +186,19 @@ class Blacksmith(NPC):
                     return f"{target.name} не может принять предмет {item_name}!"
         return f"Предмет {item_name} не найден в инвентаре {self.name}!"
 
+    def sell_weapon(self, target, weapon_name, price):
+        weapon = Weapon(weapon_name, 10)  # Меч с фиксированной силой 10
+        if target.money >= price:
+            target.money -= price
+            target.weapon = weapon.name
+            return f"{self.name} продал {weapon_name} для {target.name} за {price} монет. Теперь у {target.name} новое оружие: {weapon_name}!"
+        else:
+            return f"У {target.name} недостаточно денег для покупки {weapon_name}!"
+
 
 # класс торговца
 class Trader(NPC):
-    def __init__(self, name="", health=100, mana=100, level=1, items=None):
+    def __init__(self, name="Торговец Фёдор", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
         self.items = items if items is not None else []
         self.profession = "Торговец"
@@ -183,22 +213,28 @@ class Trader(NPC):
     def sell_item(self, target, item_name, price):
         for item in self.items:
             if item.name == item_name:
-                if hasattr(target, "weapon"):
-                    target.weapon = item.name
+                if target.money >= price:
+                    target.money -= price
+                    if isinstance(item, Potion):
+                        if "Health" in item.name:
+                            target.health_potions.append(item)
+                        elif "Mana" in item.name:
+                            target.mana_potions.append(item)
+                    else:
+                        if hasattr(target, "weapon"):
+                            target.weapon = item.name
+                        elif hasattr(target, "items"):
+                            target.items.append(item)
                     self.items.remove(item)
-                    return f"{self.name} продал {item_name} для {target.name} за {price} монет. Теперь у {target.name} новое оружие: {item_name}!"
-                elif hasattr(target, "items"):
-                    target.items.append(item)
-                    self.items.remove(item)
-                    return f"{self.name} продал {item_name} для {target.name} за {price} монет. Предмет добавлен в инвентарь {target.name}!"
+                    return f"{self.name} продал {item_name} для {target.name} за {price} монет."
                 else:
-                    return f"{target.name} не может принять предмет {item_name}!"
+                    return f"У {target.name} недостаточно денег для покупки {item_name}!"
         return f"Предмет {item_name} не найден в инвентаре {self.name}!"
 
 
 # класс странствующего волшебника
 class WanderingWizard(NPC):
-    def __init__(self, name="", health=100, mana=100, level=1, items=None):
+    def __init__(self, name="Волшебник Мирон", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
         self.items = items if items is not None else []
         self.profession = "Странствующий Волшебник"
@@ -210,7 +246,17 @@ class WanderingWizard(NPC):
         if hasattr(target, "spells"):
             target.spells.append(spell_name)
             return f"{self.name} научил {target.name} заклинанию {spell_name}!"
-        return f"{target.name} не может выучить заклинание {spell_name}!"
+
+    def sell_spell(self, target, spell_name, price):
+        if target.money >= price:
+            target.money -= price
+            if hasattr(target, "spells"):
+                target.spells.append(spell_name)
+                return f"{self.name} продал заклинание {spell_name} для {target.name} за {price} монет."
+            else:
+                return f"{target.name} не может выучить заклинание {spell_name}!"
+        else:
+            return f"У {target.name} недостаточно денег для покупки заклинания {spell_name}!"
 
 
 # классы предметов
@@ -249,7 +295,11 @@ class Enemy(Person):
         self.level = level
         self.items = items if items is not None else []
 
-    def attack(self, target, damage):
+    def attack(self, target, damage, dodge_chance):
+        # Проверяем, уклоняется ли цель
+        if random.randint(1, 100) <= dodge_chance:
+            return f"{self.name} атаковал {target.name}, но промахнулся!"
+        target.health -= damage
         return f"{self.name} атаковал {target.name}, нанеся {damage} урона."
 
     def __str__(self):

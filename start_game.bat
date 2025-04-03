@@ -1,2 +1,3 @@
 @echo off
-start cmd /k python main.py
+mode con: cols=120 lines=30
+start cmd /k python game.py
