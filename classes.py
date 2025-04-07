@@ -1,5 +1,20 @@
-# начало начал
 import random
+
+# Перемещаем класс Quest в начало файла
+class Quest:
+    def __init__(self, name, target, reward):
+        self.name = name
+        self.target = target
+        self.reward = reward
+        self.completed = False
+
+    def complete(self, player):
+        if not self.completed:
+            self.completed = True
+            player.money += self.reward
+            return f"Квест {self.name} выполнен! Вы получили {self.reward} монет."
+        return "Квест уже выполнен!"
+
 class Person:
     def __init__(self, name="", health=0, mana=0):
         self.name = name
@@ -15,8 +30,6 @@ class Person:
     def drink_mana_potion(self, potion_amount):
         self.mana += potion_amount
 
-
-# не ну это наш гг
 class Protagonist(Person):
     def __init__(self, name, health=0, mana=0, strength=0, agility=0, intellect=0, experience=0, level=0):
         super().__init__(name, health, mana)
@@ -25,9 +38,9 @@ class Protagonist(Person):
         self.intellect = intellect
         self.experience = experience
         self.level = level
-        self.money = 0  # Добавляем деньги
-        self.health_potions = []  # Список зелий здоровья
-        self.mana_potions = []  # Список зелий маны
+        self.money = 0
+        self.health_potions = []
+        self.mana_potions = []
 
     def scream(self):
         return f"Я будущий герой {self.name}, но я не выбрал специальность."
@@ -37,20 +50,18 @@ class Protagonist(Person):
 
     def use_health_potion(self):
         if self.health_potions:
-            potion = self.health_potions.pop(0)  # Удаляем и получаем первое зелье
+            potion = self.health_potions.pop(0)
             self.drink_heal_potion(potion.heal_power)
             return f"{self.name} использовал зелье здоровья и восстановил {potion.heal_power} HP. Осталось зелий: {len(self.health_potions)}."
         return f"У {self.name} нет зелий здоровья!"
 
     def use_mana_potion(self):
         if self.mana_potions:
-            potion = self.mana_potions.pop(0)  # Удаляем и получаем первое зелье
+            potion = self.mana_potions.pop(0)
             self.drink_mana_potion(potion.heal_power)
             return f"{self.name} использовал зелье маны и восстановил {potion.heal_power} маны. Осталось зелий: {len(self.mana_potions)}."
         return f"У {self.name} нет зелий маны!"
 
-
-# дальше идёт класс воина
 class Warrior(Protagonist):
     def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1, weapon=None):
         super().__init__(name, health, mana, strength, agility, intellect, experience, level)
@@ -68,13 +79,10 @@ class Warrior(Protagonist):
             self.agility += 2
             self.intellect += 1
             self.experience = 0
-        # Урон увеличивается за счёт strength
         total_damage = damage + self.strength
         weapon_name = self.weapon if self.weapon else "кулаками"
         return f"{self.name} нанес с помощью {weapon_name} по {target} урон {total_damage}."
 
-
-# класс мага
 class Mage(Protagonist):
     def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1, spells=None):
         super().__init__(name, health, mana, strength, agility, intellect, experience, level)
@@ -94,12 +102,9 @@ class Mage(Protagonist):
             self.agility += 2
             self.intellect += 4
             self.experience = 0
-        # Урон увеличивается за счёт intellect
         total_damage = damage + self.intellect * 2
         return f"{self.name} нанес заклинанием {spell} по {target} урон {total_damage}."
 
-
-# класс лучника
 class Archer(Protagonist):
     def __init__(self, name="", health=100, mana=100, strength=1, agility=1, intellect=1, experience=0, level=1, weapon="bow"):
         super().__init__(name, health, mana, strength, agility, intellect, experience, level)
@@ -113,15 +118,12 @@ class Archer(Protagonist):
             self.agility += 3
             self.intellect += 1
             self.experience = 0
-        # Урон увеличивается за счёт agility
         total_damage = damage + self.agility
         return f"{self.name} выпустил стрелу из {self.weapon} по {target} урон {total_damage}."
 
     def scream(self):
         return f"Я лучница {self.name}, и мой лук — {self.weapon}."
 
-
-# нпс
 class NPC(Person):
     def __init__(self, name="", health=100, mana=100, level=1):
         super().__init__(name, health, mana)
@@ -131,8 +133,6 @@ class NPC(Person):
     def scream(self):
         return f"Я {self.name}, обычный NPC!"
 
-
-# класс травника
 class Herbalist(NPC):
     def __init__(self, name="Травник Василий", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
@@ -155,8 +155,6 @@ class Herbalist(NPC):
                 return f"{self.name} передал зелье {potion_name} для {target.name}. {target.name} восстановил {potion.heal_power} здоровья!"
         return f"Зелье {potion_name} не найдено в инвентаре {self.name}!"
 
-
-# класс кузнеца
 class Blacksmith(NPC):
     def __init__(self, name="Кузнец Иван", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
@@ -171,23 +169,8 @@ class Blacksmith(NPC):
         self.items.append(item)
         return f"Предмет {item_name} с силой {item_power} выкован и добавлен в инвентарь!"
 
-    def give_item(self, target, item_name):
-        for item in self.items:
-            if item.name == item_name:
-                if hasattr(target, "weapon"):
-                    target.weapon = item.name
-                    self.items.remove(item)
-                    return f"{self.name} передал {item_name} для {target.name}. Теперь у {target.name} новое оружие: {item_name} с силой {item.power}!"
-                elif hasattr(target, "items"):
-                    target.items.append(item)
-                    self.items.remove(item)
-                    return f"{self.name} передал {item_name} для {target.name}. Предмет добавлен в инвентарь {target.name}!"
-                else:
-                    return f"{target.name} не может принять предмет {item_name}!"
-        return f"Предмет {item_name} не найден в инвентаре {self.name}!"
-
     def sell_weapon(self, target, weapon_name, price):
-        weapon = Weapon(weapon_name, 10)  # Меч с фиксированной силой 10
+        weapon = Weapon(weapon_name, 10)
         if target.money >= price:
             target.money -= price
             target.weapon = weapon.name
@@ -195,8 +178,6 @@ class Blacksmith(NPC):
         else:
             return f"У {target.name} недостаточно денег для покупки {weapon_name}!"
 
-
-# класс торговца
 class Trader(NPC):
     def __init__(self, name="Торговец Фёдор", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
@@ -231,8 +212,6 @@ class Trader(NPC):
                     return f"У {target.name} недостаточно денег для покупки {item_name}!"
         return f"Предмет {item_name} не найден в инвентаре {self.name}!"
 
-
-# класс странствующего волшебника
 class WanderingWizard(NPC):
     def __init__(self, name="Волшебник Мирон", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana, level)
@@ -258,8 +237,6 @@ class WanderingWizard(NPC):
         else:
             return f"У {target.name} недостаточно денег для покупки заклинания {spell_name}!"
 
-
-# классы предметов
 class Weapon:
     def __init__(self, name, power):
         self.name = name
@@ -267,16 +244,6 @@ class Weapon:
 
     def use(self):
         return f"Использовано оружие {self.name} с силой {self.power}!"
-
-
-class Armor:
-    def __init__(self, name, defense):
-        self.name = name
-        self.defense = defense
-
-    def use(self):
-        return f"Надеты доспехи {self.name} с защитой {self.defense}!"
-
 
 class Potion:
     def __init__(self, name, heal_power):
@@ -287,8 +254,6 @@ class Potion:
         target.drink_heal_potion(self.heal_power)
         return f"Зелье {self.name} использовано! {target.name} восстановил {self.heal_power} здоровья."
 
-
-# враги
 class Enemy(Person):
     def __init__(self, name="", health=100, mana=100, level=1, items=None):
         super().__init__(name, health, mana)
@@ -296,7 +261,6 @@ class Enemy(Person):
         self.items = items if items is not None else []
 
     def attack(self, target, damage, dodge_chance):
-        # Проверяем, уклоняется ли цель
         if random.randint(1, 100) <= dodge_chance:
             return f"{self.name} атаковал {target.name}, но промахнулся!"
         target.health -= damage
@@ -304,7 +268,6 @@ class Enemy(Person):
 
     def __str__(self):
         return f"{self.name} (уровень: {self.level}, здоровье: {self.health}, мана: {self.mana})"
-
 
 class Imp(Enemy):
     def __init__(self, name="Бес", health=80, mana=150, level=1, items=None):
@@ -316,7 +279,6 @@ class Imp(Enemy):
         self.mana += stolen_mana
         return f"{self.name} украл {stolen_mana} маны у {target.name}!"
 
-
 class Necromancer(Enemy):
     def __init__(self, name="Некромант", health=90, mana=120, level=2, items=None):
         super().__init__(name, health, mana, level, items)
@@ -326,7 +288,6 @@ class Necromancer(Enemy):
 
     def curse(self, target, damage):
         return f"{self.name} наложил проклятие на {target.name}, нанеся {damage} урона и снизив силу!"
-
 
 class Boss(Imp):
     def __init__(self, name="Король Бесов", health=300, mana=200, level=5, items=None):

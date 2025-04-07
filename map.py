@@ -1,101 +1,220 @@
 import random
 import time
-from classes import Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss
-
+from classes import Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss, Potion
 
 # Константы
 CONSOLE_WIDTH = 120
 CONSOLE_HEIGHT = 29
-VIEW_WIDTH = 27      # Видимая ширина карты в клетках (54 символа с пробелами)
-VIEW_HEIGHT = 27     # Видимая высота карты в клетках
+VIEW_WIDTH = 27
+VIEW_HEIGHT = 27
 MAP_WIDTH = 200
 MAP_HEIGHT = 200
-STATS_WIDTH = 63     # Ширина области статистики и лога (120 - 54 (карта) - 3 (разделитель и рамка))
-LOG_HEIGHT = 15      # Высота области лога (15 строк)
-STATS_HEIGHT = 10    # Высота области статистики (10 строк, итого 27 строк с учётом рамки)
-INTERACTION_RADIUS = 2  # Радиус взаимодействия (2 клетки)
+STATS_WIDTH = 63
+LOG_HEIGHT = 15
+STATS_HEIGHT = 10
+INTERACTION_RADIUS = 3
+SPAWN_RADIUS = 5
 
 # Символы
-PLAYER = "@"
-MONSTER = "M"
-NPC = "N"
-CITY = "C"
-EMPTY = "\033[32mW\033[0m"  # Зелёный W
-BORDER = "\033[30m#\033[0m"  # Чёрный # с ANSI-кодом
+EMPTY = "\033[32mW\033[0m"
+BORDER = "\033[30m#\033[0m"
 DIVIDER = "|"
+
+# Скины (3x3)
+WARRIOR_SKIN = [
+    [" ", " ", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+MAGE_SKIN = [
+    [" ", "*", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+ARCHER_SKIN = [
+    [" ", "^", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+IMP_SKIN = [
+    [" ", "X", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+NECROMANCER_SKIN = [
+    [" ", "~", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+BOSS_SKIN = [
+    [" ", "#", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+HERBALIST_SKIN = [
+    [" ", "@", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+TRADER_SKIN = [
+    [" ", "$", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+BLACKSMITH_SKIN = [
+    [" ", "&", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+WIZARD_SKIN = [
+    [" ", "?", " "],
+    ["/", "|", "\\"],
+    ["/", " ", "\\"]
+]
+CITY_SKIN = [
+    ["#", "#", "#"],
+    ["|", "|", "|"],
+    ["_", "_", "_"]
+]
 
 # Глобальные переменные
 player_x, player_y = MAP_WIDTH // 2, MAP_HEIGHT // 2
-field = [[EMPTY for _ in range(MAP_WIDTH)] for _ in range(MAP_HEIGHT)]
-interaction_log = []  # Лог взаимодействий
-current_entity = None  # Текущий объект взаимодействия (монстр или NPC)
-entity_position = None  # Позиция текущего объекта взаимодействия
+field = [[{"type": "empty", "entity": None, "skin": EMPTY} for _ in range(MAP_WIDTH)] for _ in range(MAP_HEIGHT)]
+interaction_log = []
+current_entity = None
+entity_position = None
+player_class = None
+entity_positions = {}  # (x, y) -> {"type": type, "entity": entity}
 
 def wrap_text(text, width):
-    """Переносит текст на следующую строку, если он превышает заданную ширину."""
     words = text.split()
     lines = []
     current_line = []
     current_length = 0
 
     for word in words:
-        # Учитываем длину слова и пробел
-        word_length = len(word) + 1  # +1 для пробела
+        word_length = len(word) + 1
         if current_length + word_length <= width:
             current_line.append(word)
             current_length += word_length
         else:
-            # Если строка превышает ширину, добавляем её в список и начинаем новую
             lines.append(" ".join(current_line))
             current_line = [word]
             current_length = len(word) + 1
 
-    # Добавляем последнюю строку, если она не пустая
     if current_line:
         lines.append(" ".join(current_line))
 
     return lines
 
-def place_random(symbol, count=1):
-    global player_x, player_y
+def place_random(entity_type, count=1):
+    global player_x, player_y, entity_positions
     for _ in range(count):
         while True:
-            x, y = random.randint(0, MAP_WIDTH - 1), random.randint(0, MAP_HEIGHT - 1)
-            if field[y][x] == EMPTY and not (player_x <= x < player_x + 3 and player_y <= y < player_y + 2):
-                field[y][x] = symbol
+            x, y = random.randint(0, MAP_WIDTH - 3), random.randint(0, MAP_HEIGHT - 3)
+            can_place = True
+            for i in range(3):
+                for j in range(3):
+                    if not (0 <= y + i < MAP_HEIGHT and 0 <= x + j < MAP_WIDTH) or \
+                       field[y + i][x + j]["type"] != "empty" or \
+                       (player_x <= x + j < player_x + 3 and player_y <= y + i < player_y + 3):
+                        can_place = False
+                        break
+                if not can_place:
+                    break
+            if can_place:
+                entity = None
+                if entity_type == "imp":
+                    entity = Imp()
+                elif entity_type == "necromancer":
+                    entity = Necromancer()
+                elif entity_type == "boss":
+                    entity = Boss()
+                elif entity_type == "herbalist":
+                    entity = Herbalist()
+                    entity.items.append(Potion("Health Potion", 20))
+                elif entity_type == "trader":
+                    entity = Trader()
+                elif entity_type == "blacksmith":
+                    entity = Blacksmith()
+                elif entity_type == "wizard":
+                    entity = WanderingWizard()
+                for i in range(3):
+                    for j in range(3):
+                        field[y + i][x + j] = {"type": entity_type, "entity": entity, "skin": None}
+                entity_positions[(x, y)] = {"type": entity_type, "entity": entity}
                 break
 
+def spawn_quest_target(target_name):
+    global player_x, player_y, entity_positions
+    while True:
+        offset_x = random.randint(-SPAWN_RADIUS, SPAWN_RADIUS)
+        offset_y = random.randint(-SPAWN_RADIUS, SPAWN_RADIUS)
+        target_x = player_x + offset_x
+        target_y = player_y + offset_y
+
+        can_place = True
+        for i in range(3):
+            for j in range(3):
+                if not (0 <= target_x + j < MAP_WIDTH and 0 <= target_y + i < MAP_HEIGHT) or \
+                   field[target_y + i][target_x + j]["type"] != "empty" or \
+                   (player_x <= target_x + j < player_x + 3 and player_y <= target_y + i < player_y + 3):
+                    can_place = False
+                    break
+            if not can_place:
+                break
+        if can_place:
+            entity_type = "imp" if target_name == "Imp" else "necromancer" if target_name == "Некромант" else "boss"
+            entity = Imp() if entity_type == "imp" else Necromancer() if entity_type == "necromancer" else Boss()
+            for i in range(3):
+                for j in range(3):
+                    field[target_y + i][target_x + j] = {"type": entity_type, "entity": entity, "skin": None}
+            entity_positions[(target_x, target_y)] = {"type": entity_type, "entity": entity}
+            break
+
 def generate_map():
-    global field
-    field = [[EMPTY for _ in range(MAP_WIDTH)] for _ in range(MAP_HEIGHT)]
+    global field, player_class, entity_positions
+    from game import player
+    field = [[{"type": "empty", "entity": None, "skin": EMPTY} for _ in range(MAP_WIDTH)] for _ in range(MAP_HEIGHT)]
+    player_class = player.__class__.__name__.lower()
+    entity_positions = {}
     draw_person(player_x, player_y)
-    place_random(MONSTER, 10)
-    place_random(NPC, 10)
-    place_random(CITY, 6)
+    place_random("imp", 5)
+    place_random("necromancer", 3)
+    place_random("boss", 2)
+    place_random("herbalist", 3)
+    place_random("trader", 3)
+    place_random("blacksmith", 2)
+    place_random("wizard", 2)
+    place_random("city", 6)
 
 def draw_person(x, y):
-    for i in range(2):
+    global entity_positions
+    skin = WARRIOR_SKIN if player_class == "warrior" else MAGE_SKIN if player_class == "mage" else ARCHER_SKIN
+    for i in range(3):
         for j in range(3):
             if 0 <= y + i < MAP_HEIGHT and 0 <= x + j < MAP_WIDTH:
-                if field[y + i][x + j] == EMPTY:
-                    field[y + i][x + j] = PLAYER
+                if field[y + i][x + j]["type"] == "empty":
+                    field[y + i][x + j] = {"type": "player", "entity": None, "skin": skin[i][j]}
+    entity_positions[(x, y)] = {"type": "player", "entity": None}
 
 def can_move(new_x, new_y):
-    for i in range(2):
+    for i in range(3):
         for j in range(3):
-            if (0 <= new_x + j < MAP_WIDTH and 0 <= new_y + i < MAP_HEIGHT and
-                field[new_y + i][new_x + j] in [MONSTER, CITY, NPC]):
+            if not (0 <= new_x + j < MAP_WIDTH and 0 <= new_y + i < MAP_HEIGHT) or \
+               field[new_y + i][new_x + j]["type"] in ["imp", "necromancer", "boss", "city", "herbalist", "trader", "blacksmith", "wizard"]:
                 return False
     return True
 
 def move_player(direction):
-    global player_x, player_y, current_entity, entity_position
+    global player_x, player_y, current_entity, entity_position, entity_positions
+    from game import city_choice_state, is_trading, quests_list
     old_x, old_y = player_x, player_y
     new_x, new_y = player_x, player_y
 
     if direction == 'w' and player_y > 0:
         new_y -= 1
-    elif direction == 's' and player_y < MAP_HEIGHT - 2:
+    elif direction == 's' and player_y < MAP_HEIGHT - 3:
         new_y += 1
     elif direction == 'a' and player_x > 0:
         new_x -= 1
@@ -103,42 +222,45 @@ def move_player(direction):
         new_x += 1
 
     if (new_x, new_y) != (old_x, old_y) and can_move(new_x, new_y):
-        for i in range(2):
+        for i in range(3):
             for j in range(3):
                 if (0 <= old_y + i < MAP_HEIGHT and 0 <= old_x + j < MAP_WIDTH and
-                    field[old_y + i][old_x + j] == PLAYER):
-                    field[old_y + i][old_x + j] = EMPTY
+                    field[old_y + i][old_x + j]["type"] == "player"):
+                    field[old_y + i][old_x + j] = {"type": "empty", "entity": None, "skin": EMPTY}
+        if (old_x, old_y) in entity_positions:
+            del entity_positions[(old_x, old_y)]
         player_x, player_y = new_x, new_y
         draw_person(player_x, player_y)
-        # Если игрок отошёл от объекта, сбрасываем текущее взаимодействие
         if entity_position and not (abs(player_x - entity_position[0]) <= INTERACTION_RADIUS and abs(player_y - entity_position[1]) <= INTERACTION_RADIUS):
             current_entity = None
             entity_position = None
-            interaction_log.clear()  # Очищаем лог при уходе
+            if city_choice_state is not None:
+                city_choice_state = None
+                is_trading = False
+                quests_list = None
+            interaction_log.clear()
             interaction_log.append("Вы отошли от объекта.")
 
 def interact(interact_callback):
-    global interaction_log, current_entity, entity_position
+    global interaction_log, current_entity, entity_position, entity_positions
     interactions = []
-
-    # Очищаем лог перед новым взаимодействием
     interaction_log.clear()
 
-    # Если уже есть текущее взаимодействие (например, бой с монстром), продолжаем его
+    # Если уже есть текущий объект взаимодействия, работаем только с ним
     if current_entity:
         if isinstance(current_entity, (Imp, Necromancer, Boss)):
-            # Продолжаем бой с монстром
             msg = interact_callback("monster", current_entity)
-            # Переносим текст, если он длинный
             wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
             interactions.extend(wrapped_msgs)
-            # Если монстр мёртв, убираем его с карты
             if current_entity.health <= 0:
-                field[entity_position[1]][entity_position[0]] = EMPTY
+                for i in range(3):
+                    for j in range(3):
+                        field[entity_position[1] + i][entity_position[0] + j] = {"type": "empty", "entity": None, "skin": EMPTY}
+                if entity_position in entity_positions:
+                    del entity_positions[entity_position]
                 current_entity = None
                 entity_position = None
         elif isinstance(current_entity, (Herbalist, Blacksmith, Trader, WanderingWizard)):
-            # Продолжаем взаимодействие с NPC
             msg = interact_callback("npc", current_entity)
             wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
             interactions.extend(wrapped_msgs)
@@ -147,28 +269,41 @@ def interact(interact_callback):
             interaction_log = interaction_log[-LOG_HEIGHT:]
         return interactions
 
-    # Проверяем, есть ли рядом объекты для взаимодействия (в радиусе 2 клеток)
-    for i in range(-INTERACTION_RADIUS, INTERACTION_RADIUS + 1):
-        for j in range(-INTERACTION_RADIUS, INTERACTION_RADIUS + 1):
-            target_x, target_y = player_x + j, player_y + i
-            if 0 <= target_x < MAP_WIDTH and 0 <= target_y < MAP_HEIGHT:
-                target = field[target_y][target_x]
-                if target == MONSTER:
-                    current_entity = interact_callback("create_monster")
-                    entity_position = (target_x, target_y)
-                    msg = interact_callback("monster", current_entity)
-                    wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
-                    interactions.extend(wrapped_msgs)
-                elif target == NPC:
-                    current_entity = interact_callback("create_npc")
-                    entity_position = (target_x, target_y)
-                    msg = interact_callback("npc", current_entity)
-                    wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
-                    interactions.extend(wrapped_msgs)
-                elif target == CITY:
-                    msg = "Житель говорит: Добро пожаловать в наш город!"
-                    wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
-                    interactions.extend(wrapped_msgs)
+    # Ищем ближайший объект для взаимодействия
+    closest_entity = None
+    closest_position = None
+    closest_distance = float('inf')
+
+    for pos, data in entity_positions.items():
+        if data["type"] == "player":  # Пропускаем игрока
+            continue
+        entity_x, entity_y = pos
+        # Проверяем, находится ли игрок в радиусе взаимодействия с объектом
+        distance = max(abs(player_x - entity_x), abs(player_y - entity_y))
+        if distance <= INTERACTION_RADIUS:
+            if distance < closest_distance:
+                closest_distance = distance
+                closest_entity = data["entity"]
+                closest_position = pos
+
+    # Если нашли объект, взаимодействуем с ним
+    if closest_position:
+        target_type = entity_positions[closest_position]["type"]
+        current_entity = closest_entity
+        entity_position = closest_position
+        if target_type in ["imp", "necromancer", "boss"]:
+            msg = interact_callback("monster", current_entity)
+            wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
+            interactions.extend(wrapped_msgs)
+        elif target_type in ["herbalist", "trader", "blacksmith", "wizard"]:
+            msg = interact_callback("npc", current_entity)
+            wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
+            interactions.extend(wrapped_msgs)
+        elif target_type == "city":
+            msg = interact_callback("city")
+            wrapped_msgs = wrap_text(msg, STATS_WIDTH - 1)
+            interactions.extend(wrapped_msgs)
+
     interaction_log.extend(interactions)
     if len(interaction_log) > LOG_HEIGHT:
         interaction_log = interaction_log[-LOG_HEIGHT:]
@@ -189,20 +324,51 @@ def draw_field(out, get_stats_callback, get_log_callback):
             end_y = MAP_HEIGHT
             start_y = max(0, end_y - VIEW_HEIGHT)
 
-        map_width_symbols = VIEW_WIDTH * 2  # 27 клеток * 2 = 54 символа с пробелами
+        display_field = [[EMPTY for _ in range(VIEW_WIDTH)] for _ in range(VIEW_HEIGHT)]
+
+        for (entity_x, entity_y), data in entity_positions.items():
+            if not (start_x <= entity_x < end_x and start_y <= entity_y < end_y):
+                continue
+
+            entity_type = data["type"]
+            if entity_type == "player":
+                skin = WARRIOR_SKIN if player_class == "warrior" else MAGE_SKIN if player_class == "mage" else ARCHER_SKIN
+            elif entity_type == "imp":
+                skin = IMP_SKIN
+            elif entity_type == "necromancer":
+                skin = NECROMANCER_SKIN
+            elif entity_type == "boss":
+                skin = BOSS_SKIN
+            elif entity_type == "herbalist":
+                skin = HERBALIST_SKIN
+            elif entity_type == "trader":
+                skin = TRADER_SKIN
+            elif entity_type == "blacksmith":
+                skin = BLACKSMITH_SKIN
+            elif entity_type == "wizard":
+                skin = WIZARD_SKIN
+            elif entity_type == "city":
+                skin = CITY_SKIN
+            else:
+                skin = [["?", "?", "?"], ["?", "?", "?"], ["?", "?", "?"]]
+
+            for i in range(3):
+                for j in range(3):
+                    map_y = entity_y - start_y + i
+                    map_x = entity_x - start_x + j
+                    if 0 <= map_y < VIEW_HEIGHT and 0 <= map_x < VIEW_WIDTH:
+                        if skin[i][j] != " ":
+                            display_field[map_y][map_x] = skin[i][j]
 
         out[0] = BORDER * CONSOLE_WIDTH
         for i in range(VIEW_HEIGHT):
-            row_idx = start_y + i
-            map_row = " ".join([field[row_idx][j] for j in range(start_x, end_x)])
+            map_row = " ".join(display_field[i])
             if i < LOG_HEIGHT:
-                # Верхняя часть: лог взаимодействий
                 log_line = get_log_callback(i + 1)
-                row = f"{BORDER}{map_row} {DIVIDER} {log_line.ljust(STATS_WIDTH - 1)}{BORDER}"
+                row = f"{BORDER}{map_row.ljust(VIEW_WIDTH * 2)} {DIVIDER} {log_line.ljust(STATS_WIDTH - 1)}{BORDER}"
             else:
-                # Нижняя часть: статистика
                 stats = get_stats_callback(i - LOG_HEIGHT + 1)
-                row = f"{BORDER}{map_row} {DIVIDER} {stats.ljust(STATS_WIDTH - 1)}{BORDER}"
+                row = f"{BORDER}{map_row.ljust(VIEW_WIDTH * 2)} {DIVIDER} {stats.ljust(STATS_WIDTH - 1)}{BORDER}"
             out[i + 1] = row
         out[VIEW_HEIGHT + 1] = BORDER * CONSOLE_WIDTH
 
