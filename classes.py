@@ -1,4 +1,5 @@
 import random
+from items import Weapon, Potion, Item
 
 # Перемещаем класс Quest в начало файла
 class Quest:
@@ -236,23 +237,6 @@ class WanderingWizard(NPC):
                 return f"{target.name} не может выучить заклинание {spell_name}!"
         else:
             return f"У {target.name} недостаточно денег для покупки заклинания {spell_name}!"
-
-class Weapon:
-    def __init__(self, name, power):
-        self.name = name
-        self.power = power
-
-    def use(self):
-        return f"Использовано оружие {self.name} с силой {self.power}!"
-
-class Potion:
-    def __init__(self, name, heal_power):
-        self.name = name
-        self.heal_power = heal_power
-
-    def use(self, target):
-        target.drink_heal_potion(self.heal_power)
-        return f"Зелье {self.name} использовано! {target.name} восстановил {self.heal_power} здоровья."
 
 class Enemy(Person):
     def __init__(self, name="", health=100, mana=100, level=1, items=None):

@@ -1,6 +1,7 @@
 import random
 import time
 from classes import Herbalist, Blacksmith, Trader, WanderingWizard, Imp, Necromancer, Boss, Potion
+import state
 
 # Константы
 CONSOLE_WIDTH = 120
@@ -208,7 +209,6 @@ def can_move(new_x, new_y):
 
 def move_player(direction):
     global player_x, player_y, current_entity, entity_position, entity_positions
-    from game import city_choice_state, is_trading, quests_list
     old_x, old_y = player_x, player_y
     new_x, new_y = player_x, player_y
 
@@ -234,10 +234,10 @@ def move_player(direction):
         if entity_position and not (abs(player_x - entity_position[0]) <= INTERACTION_RADIUS and abs(player_y - entity_position[1]) <= INTERACTION_RADIUS):
             current_entity = None
             entity_position = None
-            if city_choice_state is not None:
-                city_choice_state = None
-                is_trading = False
-                quests_list = None
+            if state.city_choice_state is not None:
+                state.city_choice_state = None
+                state.is_trading = False
+                state.quests_list = None
             interaction_log.clear()
             interaction_log.append("Вы отошли от объекта.")
 
@@ -309,67 +309,117 @@ def interact(interact_callback):
         interaction_log = interaction_log[-LOG_HEIGHT:]
     return interactions
 
-def draw_field(out, get_stats_callback, get_log_callback):
+def draw_field_with_menu(out, get_stats_callback, get_log_callback):
+    """Расширенная функция отрисовки: поддержка меню паузы и справки."""
+    from colorama import Style, Fore
     while True:
-        center_x, center_y = player_x + 1, player_y + 1
-        start_x = max(0, center_x - VIEW_WIDTH // 2)
-        end_x = start_x + VIEW_WIDTH
-        start_y = max(0, center_y - VIEW_HEIGHT // 2)
-        end_y = start_y + VIEW_HEIGHT
+        if state.game_state == "playing":
+            # Встроенная логика отрисовки поля (заменяет draw_field)
+            center_x, center_y = player_x + 1, player_y + 1
+            start_x = max(0, center_x - VIEW_WIDTH // 2)
+            end_x = start_x + VIEW_WIDTH
+            start_y = max(0, center_y - VIEW_HEIGHT // 2)
+            end_y = start_y + VIEW_HEIGHT
 
-        if end_x > MAP_WIDTH:
-            end_x = MAP_WIDTH
-            start_x = max(0, end_x - VIEW_WIDTH)
-        if end_y > MAP_HEIGHT:
-            end_y = MAP_HEIGHT
-            start_y = max(0, end_y - VIEW_HEIGHT)
+            if end_x > MAP_WIDTH:
+                end_x = MAP_WIDTH
+                start_x = max(0, end_x - VIEW_WIDTH)
+            if end_y > MAP_HEIGHT:
+                end_y = MAP_HEIGHT
+                start_y = max(0, end_y - VIEW_HEIGHT)
 
-        display_field = [[EMPTY for _ in range(VIEW_WIDTH)] for _ in range(VIEW_HEIGHT)]
+            display_field = [[EMPTY for _ in range(VIEW_WIDTH)] for _ in range(VIEW_HEIGHT)]
 
-        for (entity_x, entity_y), data in entity_positions.items():
-            if not (start_x <= entity_x < end_x and start_y <= entity_y < end_y):
-                continue
+            for (entity_x, entity_y), data in entity_positions.items():
+                entity_type = data["type"]
+                if entity_type == "player":
+                    skin = WARRIOR_SKIN if player_class == "warrior" else MAGE_SKIN if player_class == "mage" else ARCHER_SKIN
+                elif entity_type == "imp":
+                    skin = IMP_SKIN
+                elif entity_type == "necromancer":
+                    skin = NECROMANCER_SKIN
+                elif entity_type == "boss":
+                    skin = BOSS_SKIN
+                elif entity_type == "herbalist":
+                    skin = HERBALIST_SKIN
+                elif entity_type == "trader":
+                    skin = TRADER_SKIN
+                elif entity_type == "blacksmith":
+                    skin = BLACKSMITH_SKIN
+                elif entity_type == "wizard":
+                    skin = WIZARD_SKIN
+                elif entity_type == "city":
+                    skin = CITY_SKIN
+                else:
+                    skin = [["?", "?", "?"], ["?", "?", "?"], ["?", "?", "?"]]
+                for i in range(3):
+                    for j in range(3):
+                        map_y = entity_y - start_y + i
+                        map_x = entity_x - start_x + j
+                        if 0 <= map_y < VIEW_HEIGHT and 0 <= map_x < VIEW_WIDTH:
+                            if skin[i][j] != " ":
+                                display_field[map_y][map_x] = skin[i][j]
 
-            entity_type = data["type"]
-            if entity_type == "player":
-                skin = WARRIOR_SKIN if player_class == "warrior" else MAGE_SKIN if player_class == "mage" else ARCHER_SKIN
-            elif entity_type == "imp":
-                skin = IMP_SKIN
-            elif entity_type == "necromancer":
-                skin = NECROMANCER_SKIN
-            elif entity_type == "boss":
-                skin = BOSS_SKIN
-            elif entity_type == "herbalist":
-                skin = HERBALIST_SKIN
-            elif entity_type == "trader":
-                skin = TRADER_SKIN
-            elif entity_type == "blacksmith":
-                skin = BLACKSMITH_SKIN
-            elif entity_type == "wizard":
-                skin = WIZARD_SKIN
-            elif entity_type == "city":
-                skin = CITY_SKIN
-            else:
-                skin = [["?", "?", "?"], ["?", "?", "?"], ["?", "?", "?"]]
-
-            for i in range(3):
-                for j in range(3):
-                    map_y = entity_y - start_y + i
-                    map_x = entity_x - start_x + j
-                    if 0 <= map_y < VIEW_HEIGHT and 0 <= map_x < VIEW_WIDTH:
-                        if skin[i][j] != " ":
-                            display_field[map_y][map_x] = skin[i][j]
-
-        out[0] = BORDER * CONSOLE_WIDTH
-        for i in range(VIEW_HEIGHT):
-            map_row = " ".join(display_field[i])
-            if i < LOG_HEIGHT:
-                log_line = get_log_callback(i + 1)
-                row = f"{BORDER}{map_row.ljust(VIEW_WIDTH * 2)} {DIVIDER} {log_line.ljust(STATS_WIDTH - 1)}{BORDER}"
-            else:
-                stats = get_stats_callback(i - LOG_HEIGHT + 1)
-                row = f"{BORDER}{map_row.ljust(VIEW_WIDTH * 2)} {DIVIDER} {stats.ljust(STATS_WIDTH - 1)}{BORDER}"
-            out[i + 1] = row
-        out[VIEW_HEIGHT + 1] = BORDER * CONSOLE_WIDTH
-
-        time.sleep(0.1)
+            out[0] = BORDER * CONSOLE_WIDTH
+            for i in range(VIEW_HEIGHT):
+                map_row = " ".join(display_field[i])
+                if i < LOG_HEIGHT:
+                    log_line = get_log_callback(i + 1)
+                    row = f"{BORDER}{map_row.ljust(VIEW_WIDTH * 2)} {DIVIDER} {log_line.ljust(STATS_WIDTH - 1)}{BORDER}"
+                else:
+                    stats = get_stats_callback(i - LOG_HEIGHT + 1)
+                    row = f"{BORDER}{map_row.ljust(VIEW_WIDTH * 2)} {DIVIDER} {stats.ljust(STATS_WIDTH - 1)}{BORDER}"
+                out[i + 1] = row
+            out[VIEW_HEIGHT + 1] = BORDER * CONSOLE_WIDTH
+            time.sleep(0.1)
+        elif state.game_state == "paused":
+            menu = [
+                Style.BRIGHT + Fore.YELLOW + "\nПауза",
+                "1. Продолжить игру",
+                "2. Справка по управлению",
+                "3. Выйти из игры"
+            ]
+            for i in range(CONSOLE_HEIGHT):
+                if i < len(menu):
+                    out[i] = menu[i]
+                else:
+                    out[i] = " " * CONSOLE_WIDTH
+            time.sleep(0.1)
+        elif state.game_state == "help":
+            help_lines = [
+                Style.BRIGHT + Fore.YELLOW + "\nУправление:",
+                "WASD — перемещение",
+                "E — взаимодействие",
+                "H — использовать зелье здоровья",
+                "M — использовать зелье маны",
+                "F5 — сохранить игру",
+                "F9 — загрузить игру",
+                "K — квесты, B — биржа, 1-3 — выбор",
+                "ESC — пауза/выход в меню",
+                "\nНажмите 1 для возврата в игру"
+            ]
+            for i in range(CONSOLE_HEIGHT):
+                if i < len(help_lines):
+                    out[i] = help_lines[i]
+                else:
+                    out[i] = " " * CONSOLE_WIDTH
+            time.sleep(0.1)
+        elif state.game_state == "exit":
+            for i in range(CONSOLE_HEIGHT):
+                out[i] = ""
+            out[CONSOLE_HEIGHT // 2] = Style.BRIGHT + Fore.RED + "Выход из игры..."
+            time.sleep(1)
+            import os
+            os._exit(0)
+        elif state.game_state == "game_over":
+            game_over_message = Style.BRIGHT + Fore.RED + "GAME OVER"
+            for i in range(CONSOLE_HEIGHT):
+                if i == CONSOLE_HEIGHT // 2:
+                    out[i] = game_over_message.center(CONSOLE_WIDTH)
+                else:
+                    out[i] = " " * CONSOLE_WIDTH
+            time.sleep(3)
+            import os
+            os._exit(0)
+        else:
+            time.sleep(0.1)
